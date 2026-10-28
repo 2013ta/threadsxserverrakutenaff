@@ -21,6 +21,6 @@ export RAKUTEN_APP_ID=...          # 任意
 export RAKUTEN_AFFILIATE_ID=...    # 未設定ならプレースホルダーのリンク
 python -m rakuten_wp.cli examples/savas_protein.json --html page.html --out out
 # 投稿（下書き）
-export WP_DOMAIN=example.com WP_USER=... WP_APP_PASSWORD=...
-python -m rakuten_wp.cli examples/savas_protein.json --post
+export WP_USER=... WP_APP_PASSWORD=...
+python -m rakuten_wp.cli examples/savas_protein.json --post   # 投稿先は arauyo.com（WP_DOMAIN で変更可）
 ```
