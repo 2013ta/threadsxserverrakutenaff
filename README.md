@@ -12,6 +12,16 @@ WordPress REST API リクエストを作る。既定では出力のみで、`--p
    - 価格：「価格はお得な変動があるためリンク先でご確認ください」
    - レビュー：レビュー由来の一文を入れない（本文にレビュー表現があればルール違反として止める）
 
+## アイキャッチ画像とカテゴリ
+トップページの記事カードが「NO IMAGE」「未分類」になるのを防ぐため、`--post` 時に次も行う。
+
+- 商品画像：楽天API の `mediumImageUrls`（600x600 に拡大）→ 商品ページの og:image / JSON-LD の順で探し、
+  WordPress のメディアにアップロードしてアイキャッチ（`featured_media`）に設定する。
+  article.json の `image_url` で手動指定も可。画像が取れない・アップに失敗した場合はアイキャッチなしで投稿を続ける。
+- カテゴリ：`--category 名前`（複数可）＞ article.json の `categories` ＞ 環境変数 `WP_CATEGORY`。
+  WordPress に無い名前は自動で作成する。
+- X / Threads 用：`social.json` に本文・アフィリンク・商品画像URL（投稿後は WordPress 側の画像URLと記事URLも）を書き出す。
+
 ※ API のエンドポイント・パラメータはアプリID発行時に楽天ウェブサービスの最新仕様と照合すること。
 
 ## 使い方
@@ -22,5 +32,5 @@ export RAKUTEN_AFFILIATE_ID=...    # 未設定ならプレースホルダーの�
 python -m rakuten_wp.cli examples/savas_protein.json --html page.html --out out
 # 投稿（下書き）
 export WP_USER=... WP_APP_PASSWORD=...
-python -m rakuten_wp.cli examples/savas_protein.json --post   # 投稿先は arauyo.com（WP_DOMAIN で変更可）
+python -m rakuten_wp.cli examples/savas_protein.json --category "サプリ・健康" --post   # 投稿先は arauyo.com（WP_DOMAIN で変更可）
 ```

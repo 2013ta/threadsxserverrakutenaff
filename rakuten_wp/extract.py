@@ -1,4 +1,4 @@
-"""楽天商品ページ（HTML）と楽天市場商品検索APIから、価格・レビュー情報を取り出す。
+"""楽天商品ページ（HTML）と楽天市場商品検索APIから、価格・レビュー・商品画像を取り出す。
 
 楽天の商品ページは価格やレビューをJavaScriptで後から描画することが多く、
 静的HTMLに出てこない場合がある。そのため以下の順で試し、どれでも取れなければ None を返す。
@@ -51,6 +51,7 @@ class ItemFacts:
     review_count: Optional[int] = None
     price_source: Optional[str] = None
     review_source: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 def _to_int(text: Any) -> Optional[int]:
@@ -154,10 +155,34 @@ def extract_review(html: str) -> tuple[Optional[float], Optional[int], Optional[
     return None, None, None
 
 
+def extract_image(html: str) -> Optional[str]:
+    """商品画像のURL。og:image → JSON-LD(image) の順で探す。"""
+    soup = BeautifulSoup(html, "html.parser")
+    meta = soup.find("meta", attrs={"property": "og:image"})
+    if meta and meta.get("content", "").startswith("http"):
+        return meta["content"]
+    for block in _json_ld(soup):
+        image = block.get("image")
+        if isinstance(image, list):
+            image = image[0] if image else None
+        if isinstance(image, dict):
+            image = image.get("url")
+        if isinstance(image, str) and image.startswith("http"):
+            return image
+    return None
+
+
+def large_image_url(url: str, size: int = 600) -> str:
+    """APIの画像URLは ?_ex=128x128 の小さいサムネイルなので、アイキャッチ向けの大きさに差し替える。"""
+    if "_ex=" in url:
+        return re.sub(r"_ex=\d+x\d+", f"_ex={size}x{size}", url)
+    return f"{url}{'&' if '?' in url else '?'}_ex={size}x{size}"
+
+
 def facts_from_html(html: str) -> ItemFacts:
     price, price_source = extract_price(html)
     avg, count, review_source = extract_review(html)
-    return ItemFacts(price, avg, count, price_source, review_source)
+    return ItemFacts(price, avg, count, price_source, review_source, extract_image(html))
 
 
 def facts_from_api(item_code: str, application_id: str, session=None) -> ItemFacts:
@@ -177,12 +202,16 @@ def facts_from_api(item_code: str, application_id: str, session=None) -> ItemFac
     item = items[0].get("Item", items[0])
     count = _to_int(item.get("reviewCount"))
     avg = _to_float(item.get("reviewAverage")) if count else None
+    images = item.get("mediumImageUrls") or []
+    first = images[0] if images else None
+    image = first.get("imageUrl") if isinstance(first, dict) else first
     return ItemFacts(
         price=_to_int(item.get("itemPrice")),
         review_average=avg,
         review_count=count or None,
         price_source="api",
         review_source="api" if count else None,
+        image_url=large_image_url(image) if image else None,
     )
 
 
@@ -198,6 +227,8 @@ def merge(*facts: ItemFacts) -> ItemFacts:
                 f.review_count,
                 f.review_source,
             )
+        if out.image_url is None and f.image_url:
+            out.image_url = f.image_url
     return out
 
 
